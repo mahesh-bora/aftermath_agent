@@ -81,6 +81,21 @@ def display_graph(fg: FinalGraph) -> None:
         )
 
     console.print(tbl)
+
+    # Warn if all nodes are Established — adversarial check likely failed
+    conf_counts = {}
+    for node in fg.nodes:
+        conf_counts[node.confidence] = conf_counts.get(node.confidence, 0) + 1
+    total = len(fg.nodes)
+    if total > 0:
+        est_pct = conf_counts.get("Established", 0) / total
+        parts = "  ".join(
+            f"[{CONFIDENCE_STYLE.get(k, ('white','?'))[0]}]{CONFIDENCE_STYLE.get(k,('white','?'))[1]} {v} {k}[/{CONFIDENCE_STYLE.get(k,('white','?'))[0]}]"
+            for k, v in conf_counts.items()
+        )
+        console.print(f"  [dim]Confidence distribution:[/dim]  {parts}")
+        if est_pct == 1.0:
+            console.print("  [yellow]⚠ All nodes Established — adversarial check may have been skipped[/yellow]")
     console.print()
 
     # Edges
@@ -131,11 +146,14 @@ def display_graph(fg: FinalGraph) -> None:
         ))
         console.print()
 
-    # Causal order
+    # Causal order — numbered list, not flat arrow chain
     if fg.causal_order:
-        order_text = "  →  ".join(fg.causal_order)
+        lines = [f"[dim]0.[/dim]  [yellow]{fg.trigger_event}[/yellow]  [dim](trigger)[/dim]"]
+        for i, entity in enumerate(fg.causal_order, 1):
+            indent = "   " * min(i, 4)  # visual nesting hint
+            lines.append(f"[dim]{i}.[/dim]{indent}[white]{entity}[/white]")
         console.print(Panel(
-            f"[dim]{order_text}[/dim]",
+            "\n".join(lines),
             title="[dim]Causal Order (trigger → downstream)[/dim]",
             border_style="dim",
         ))
