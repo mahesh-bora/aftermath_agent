@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
+import traceback
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -193,46 +194,49 @@ def main() -> None:
         "final_graph": None,
     }
 
-    final_graph = None
-    domains_done: list[str] = []
+    debug = os.getenv("AFTERMATH_DEBUG", "0") == "1"
+    final_state = None
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("{task.description}"),
-        console=console,
-        transient=True,
-    ) as progress:
-        task = progress.add_task("[yellow]Orchestrator analyzing trigger event...[/yellow]", total=None)
+    try:
+        with console.status("[yellow]Running Aftermath agents...[/yellow]", spinner="dots") as status:
+            # stream_mode="values" emits full state after each node — last emission is final state
+            for state_snapshot in graph.stream(initial_state, stream_mode="values"):
+                # derive which node just ran from what changed
+                briefings = state_snapshot.get("orchestrator_briefings", {})
+                outputs = state_snapshot.get("domain_outputs", [])
+                fg = state_snapshot.get("final_graph")
 
-        for event in graph.stream(initial_state, stream_mode="updates"):
-            for node_name, delta in event.items():
-                if node_name == "orchestrator_brief":
-                    n = len(delta.get("orchestrator_briefings", {}))
-                    progress.update(
-                        task,
-                        description=f"[yellow]Orchestrator briefed {n} specialists — dispatching...[/yellow]",
+                if fg is not None:
+                    status.update("[yellow]Synthesizing — done[/yellow]")
+                elif outputs:
+                    last = outputs[-1].domain
+                    col = DOMAIN_COLORS.get(last, "white")
+                    status.update(
+                        f"[dim]{len(outputs)}/{len(selected)} specialists done[/dim] "
+                        f"← [{col}]{last}[/{col}]"
                     )
-                elif node_name == "domain_specialist":
-                    outputs: list[DomainOutput] = delta.get("domain_outputs", [])
-                    for o in outputs:
-                        domains_done.append(o.domain)
-                    col = DOMAIN_COLORS.get(domains_done[-1], "white") if domains_done else "white"
-                    done_str = f"[{col}]{domains_done[-1]}[/{col}]" if domains_done else ""
-                    progress.update(
-                        task,
-                        description=(
-                            f"[dim]{len(domains_done)}/{len(selected)} specialists done[/dim] "
-                            f"← {done_str}"
-                        ),
+                elif briefings:
+                    status.update(
+                        f"[yellow]Orchestrator briefed {len(briefings)} specialists — running...[/yellow]"
                     )
-                elif node_name == "synthesizer":
-                    progress.update(task, description="[yellow]Synthesizing final graph...[/yellow]")
-                    final_graph = delta.get("final_graph")
+
+                final_state = state_snapshot
+
+    except Exception as e:
+        console.print(f"\n[red bold]ERROR:[/red bold] {type(e).__name__}: {e}")
+        if debug:
+            traceback.print_exc()
+        else:
+            console.print("[dim]Set AFTERMATH_DEBUG=1 for full traceback.[/dim]")
+        sys.exit(1)
+
+    final_graph = final_state.get("final_graph") if final_state else None
 
     if final_graph:
         display_graph(final_graph)
     else:
-        console.print("[red]Synthesis failed — no final graph returned.[/red]")
+        console.print("[red]Synthesis failed — final_graph is None.[/red]")
+        console.print("[dim]Re-run with AFTERMATH_DEBUG=1 to see agent errors.[/dim]")
         sys.exit(1)
 
 
