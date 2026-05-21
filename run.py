@@ -224,7 +224,10 @@ def main() -> None:
                 outputs = state_snapshot.get("domain_outputs", [])
                 fg = state_snapshot.get("final_graph")
 
-                if fg is not None:
+                is_valid = state_snapshot.get("is_valid_event", True)
+                if not is_valid:
+                    status.update("[yellow]Orchestrator: invalid event — stopping[/yellow]")
+                elif fg is not None:
                     status.update("[yellow]Synthesizing — done[/yellow]")
                 elif outputs:
                     last = outputs[-1].domain
@@ -247,6 +250,16 @@ def main() -> None:
         else:
             console.print("[dim]Set AFTERMATH_DEBUG=1 for full traceback.[/dim]")
         sys.exit(1)
+
+    if final_state and not final_state.get("is_valid_event", True):
+        console.print()
+        console.print(Panel(
+            final_state.get("invalid_message", "Invalid event."),
+            title="[yellow]AFTERMATH[/yellow]",
+            border_style="yellow",
+            width=72,
+        ))
+        sys.exit(0)
 
     final_graph = final_state.get("final_graph") if final_state else None
 

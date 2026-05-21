@@ -74,6 +74,16 @@ class CausalNode(BaseModel):
     what: str = Field(description="What happened to this entity — 8 words max")
     how: str = Field(description="The specific causal mechanism — 5 words max, no vague verbs")
     confidence: str = Field(description="Established | Contested | Speculative")
+    confidence_pct: int = Field(
+        default=0, ge=0, le=100,
+        description=(
+            "Numerical confidence 0–100. "
+            "Established = 85–100 (peer-reviewed, primary sources). "
+            "Contested = 40–84 (debated in literature). "
+            "Speculative = 0–39 (plausible, limited evidence). "
+            "Be precise — 95 means stronger evidence than 86."
+        )
+    )
     timeframe: str = Field(description="When this happened or begins — e.g. 'Oct 2008', '2011–2015'")
     counter_narrative: Optional[str] = Field(
         default=None,
@@ -118,9 +128,20 @@ class FinalGraph(BaseModel):
     )
 
 
+class EventValidation(BaseModel):
+    is_valid: bool = Field(description="True if trigger is a real traceable historical/political/economic/cultural event")
+    reason: str = Field(description="One sentence explaining the decision")
+    suggested_query: Optional[str] = Field(
+        default=None,
+        description="If invalid, suggest a real event the user could ask about instead"
+    )
+
+
 class AftermathState(TypedDict):
     trigger_event: str
     selected_domains: list[str]
+    is_valid_event: bool
+    invalid_message: str
     orchestrator_briefings: dict[str, str]
     domain_outputs: Annotated[list[DomainOutput], operator.add]
     final_graph: Optional[FinalGraph]

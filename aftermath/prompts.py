@@ -83,6 +83,11 @@ For each node provide:
   what: what happened to this entity — ≤8 words
   how: the TRANSMISSION CHANNEL (not the cause, not the outcome) — ≤5 words
   confidence: Established | Contested | Speculative
+  confidence_pct: integer 0–100
+    Established = 85–100 (peer-reviewed, primary sources confirm mechanism)
+    Contested   = 40–84  (debated in literature, alternative explanations exist)
+    Speculative = 0–39   (plausible mechanism, limited empirical evidence)
+    Be precise: 95 = stronger evidence than 86. Don't default everything to 95.
   timeframe: when
   counter_narrative: required if Contested or Speculative — strongest objection to this link
 """

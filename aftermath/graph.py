@@ -6,8 +6,10 @@ from .agents.specialist import domain_specialist_node
 from .agents.synthesizer import synthesizer_node
 
 
-def _route_to_specialists(state: AftermathState) -> list[Send]:
-    """Fan-out: dispatch one Send per briefed domain. All run before synthesizer."""
+def _route_after_orchestrator(state: AftermathState):
+    """Gate: invalid event → END. Valid event → fan-out to domain specialists."""
+    if not state.get("is_valid_event", True):
+        return END
     return [
         Send("domain_specialist", {
             "trigger_event": state["trigger_event"],
@@ -26,18 +28,15 @@ def build_graph():
     builder.add_node("synthesizer", synthesizer_node)
 
     builder.add_edge(START, "orchestrator_brief")
-    # Fan-out: orchestrator_brief → N × domain_specialist (via Send)
     builder.add_conditional_edges(
         "orchestrator_brief",
-        _route_to_specialists,
-        ["domain_specialist"],
+        _route_after_orchestrator,
+        ["domain_specialist", END],
     )
-    # Fan-in: all domain_specialist nodes complete → synthesizer
     builder.add_edge("domain_specialist", "synthesizer")
     builder.add_edge("synthesizer", END)
 
     return builder.compile()
 
 
-# Module-level compiled graph — import and call .invoke() or .stream()
 graph = build_graph()

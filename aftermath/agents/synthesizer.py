@@ -101,18 +101,48 @@ def synthesizer_node(state: AftermathState) -> dict:
         for node in do.nodes:
             original_domain_map[node.entity] = do.domain
 
+    confidence_threshold = int(os.getenv("AFTERMATH_MIN_CONFIDENCE", "90"))
+
     def _enforce_domains(result: FinalGraph) -> FinalGraph:
-        """Fix domain labels the synthesizer may have changed. Filter nodes from unselected domains."""
+        """Restore correct domain labels, filter unselected domains, filter low confidence."""
         for node in result.nodes:
-            # Restore domain from specialist output if synthesizer changed it
             if node.entity in original_domain_map:
                 node.domain = original_domain_map[node.entity]
-        # Remove any node whose domain is not in selected domains
+
+        before = len(result.nodes)
+
+        # Filter unselected domains
         if selected_domains:
-            before = len(result.nodes)
             result.nodes = [n for n in result.nodes if n.domain in selected_domains]
-            if len(result.nodes) < before and DEBUG:
-                print(f"[DEBUG] dropped {before - len(result.nodes)} nodes with wrong domains")
+
+        # Filter below confidence threshold
+        # If confidence_pct is 0 (not set), derive from categorical label
+        for node in result.nodes:
+            if node.confidence_pct == 0:
+                node.confidence_pct = {"Established": 90, "Contested": 60, "Speculative": 25}.get(
+                    node.confidence, 0
+                )
+        result.nodes = [n for n in result.nodes if n.confidence_pct >= confidence_threshold]
+
+        dropped = before - len(result.nodes)
+        if dropped > 0:
+            if DEBUG:
+                print(f"[DEBUG] dropped {dropped} nodes (domain mismatch or confidence < {confidence_threshold}%)")
+            else:
+                print(f"[INFO] {dropped} nodes filtered (below {confidence_threshold}% confidence or wrong domain)")
+
+        # Also filter edges/surprise_links to only reference remaining nodes
+        remaining = {n.entity for n in result.nodes}
+        result.edges = [
+            e for e in result.edges
+            if e.from_entity in remaining and e.to_entity in remaining
+        ]
+        result.surprise_links = [
+            e for e in result.surprise_links
+            if e.from_entity in remaining and e.to_entity in remaining
+        ]
+        result.causal_order = [e for e in result.causal_order if e in remaining]
+
         return result
 
     # Attempt 1: structured output via function calling
