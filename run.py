@@ -180,7 +180,9 @@ def select_domains() -> list[str]:
             if 0 <= idx < len(ALL_DOMAINS):
                 indices.append(idx)
 
-    return [ALL_DOMAINS[i] for i in indices] if indices else ALL_DOMAINS
+    seen = set()
+    unique = [ALL_DOMAINS[i] for i in indices if not (ALL_DOMAINS[i] in seen or seen.add(ALL_DOMAINS[i]))]
+    return unique if unique else ALL_DOMAINS
 
 
 def main() -> None:
