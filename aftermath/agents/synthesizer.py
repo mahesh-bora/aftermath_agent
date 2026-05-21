@@ -94,6 +94,27 @@ def synthesizer_node(state: AftermathState) -> dict:
         )),
     ]
 
+    # Build domain → original nodes map for post-synthesis enforcement
+    selected_domains = set(state.get("selected_domains", []))
+    original_domain_map: dict[str, str] = {}  # entity → correct domain
+    for do in state["domain_outputs"]:
+        for node in do.nodes:
+            original_domain_map[node.entity] = do.domain
+
+    def _enforce_domains(result: FinalGraph) -> FinalGraph:
+        """Fix domain labels the synthesizer may have changed. Filter nodes from unselected domains."""
+        for node in result.nodes:
+            # Restore domain from specialist output if synthesizer changed it
+            if node.entity in original_domain_map:
+                node.domain = original_domain_map[node.entity]
+        # Remove any node whose domain is not in selected domains
+        if selected_domains:
+            before = len(result.nodes)
+            result.nodes = [n for n in result.nodes if n.domain in selected_domains]
+            if len(result.nodes) < before and DEBUG:
+                print(f"[DEBUG] dropped {before - len(result.nodes)} nodes with wrong domains")
+        return result
+
     # Attempt 1: structured output via function calling
     try:
         structured_llm = llm.with_structured_output(FinalGraph)
@@ -101,6 +122,7 @@ def synthesizer_node(state: AftermathState) -> dict:
         if result is None:
             raise ValueError("with_structured_output returned None")
         result.trigger_event = state["trigger_event"]
+        result = _enforce_domains(result)
         if DEBUG:
             print(f"[DEBUG] synthesizer: structured output OK, {len(result.nodes)} nodes")
         return {"final_graph": result}
@@ -121,6 +143,7 @@ def synthesizer_node(state: AftermathState) -> dict:
         ]
         response = llm.invoke(json_messages)
         result = _parse_json_response(response.content, state["trigger_event"])
+        result = _enforce_domains(result)
         if DEBUG:
             print(f"[DEBUG] synthesizer: JSON fallback OK, {len(result.nodes)} nodes")
         return {"final_graph": result}

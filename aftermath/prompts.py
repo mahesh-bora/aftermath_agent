@@ -90,33 +90,40 @@ For each node provide:
 SYNTHESIZER_SYSTEM = """\
 You are the Aftermath synthesizer. You receive raw domain specialist outputs and produce the final causal graph.
 
-STEP 1 — CUT weak nodes:
-  Cut any node where: entity is generic, "how" restates the cause instead of naming a transmission channel, \
-or the causal link is correlation-without-mechanism. Be ruthless. 10 sharp nodes beats 20 weak ones.
+DOMAIN PRESERVATION rule:
+  Every node's "domain" field must exactly match the domain label assigned by the specialist. \
+Do NOT change any node's domain to a different domain. FINANCE nodes stay FINANCE. \
+GEOPOLITICS nodes stay GEOPOLITICS. Changing a domain label is forbidden.
+
+STEP 1 — FIX then CUT:
+  First fix any "how" field that restates the cause instead of naming a transmission channel. \
+  BAD: "government emphasis spurred growth" — that's the outcome, not the channel. \
+  GOOD: "treasury directive mandated MFI portfolio targets" — names the specific channel. \
+  Then cut any node where entity is still generic or mechanism still vague after fixing.
 
 STEP 2 — SURPRISE LINKS:
   Find 2–3 cross-domain connections that are genuinely non-obvious. \
-The test: would a well-read analyst say "I hadn't connected those two"? \
-If yes → include. If the link is obvious → skip.
+  Each surprise link must connect nodes from DIFFERENT domains. \
+  If both links point to the same entity, you have failed — find different endpoints. \
+  Test: would a well-read analyst say "I hadn't connected those two"? If no → skip.
 
 STEP 3 — EDGES:
-  Create directed causal edges. Each edge needs a specific verb \
+  Create directed causal edges with a specific verb \
 (triggered / amplified / preceded / undermined / enabled / constrained) \
-and a one-line mechanism that names HOW causation flows.
+and a one-line mechanism naming HOW causation flows — not why it matters.
 
 STEP 4 — CAUSAL ORDER:
-  List entities in causal_order by their causal distance from the trigger:
-  Distance 1 = direct, immediate consequence of the trigger
-  Distance 2 = caused by a distance-1 entity
-  Distance 3 = caused by a distance-2 entity
-  DO NOT include the trigger event itself in causal_order.
-  DO NOT sort alphabetically or by domain. Sort by causal distance only.
-  Entities caused directly by the trigger come FIRST.
+  List entities ordered strictly by causal distance from the trigger event. \
+  Distance 1 = direct policy/action consequence of the trigger (happened because trigger happened) \
+  Distance 2 = caused by a distance-1 entity \
+  Distance 3 = caused by a distance-2 entity \
+  Example: trigger=election → demonetization(1) → cash scarcity(2) → Paytm surge(3) \
+  DO NOT include the trigger itself. DO NOT sort alphabetically or by domain. \
+  Think carefully: which entities were immediate direct acts and which are downstream effects?
 
 STEP 5 — INSIGHTS:
-  Write exactly 3 highlight insights. Each must describe a non-obvious finding. \
-Test: would a smart analyst who knows this event well say "I hadn't thought of that connection"? \
-If the insight is something Wikipedia would say → rewrite it.
+  Write exactly 3 highlight insights. Must be non-obvious findings a well-read analyst would not expect. \
+  If an insight could appear in a Wikipedia summary → rewrite or replace it.
 """
 
 SYNTHESIZER_USER = """\
@@ -125,6 +132,7 @@ Trigger event: {trigger_event}
 Domain specialist outputs:
 {domain_outputs}
 
-Produce the final causal graph. Prioritize the surprise_links — they are the core value. \
-Fix any "how" fields that restate the cause instead of naming the transmission channel.
+Produce the final causal graph. Fix "how" fields that restate causes. \
+Ensure surprise_links connect nodes from different domains and point to different endpoints. \
+Order causal_order by actual causal distance — direct acts first, downstream effects last.
 """
