@@ -1,12 +1,11 @@
 import os
 import json
 import traceback
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from ..state import AftermathState, FinalGraph, DomainOutput
 from ..prompts import SYNTHESIZER_SYSTEM, SYNTHESIZER_USER
+from ..llm import make_llm
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 DEBUG = os.getenv("AFTERMATH_DEBUG", "0") == "1"
 
 _JSON_SCHEMA = """
@@ -83,7 +82,7 @@ def synthesizer_node(state: AftermathState) -> dict:
     if DEBUG:
         print(f"\n[DEBUG] synthesizer: {len(state['domain_outputs'])} domain outputs")
 
-    llm = ChatGoogleGenerativeAI(model=MODEL, temperature=0.5)
+    llm = make_llm(temperature=0.5)
     domain_outputs_text = _format_domain_outputs(state["domain_outputs"])
 
     messages = [
@@ -101,7 +100,9 @@ def synthesizer_node(state: AftermathState) -> dict:
         for node in do.nodes:
             original_domain_map[node.entity] = do.domain
 
-    confidence_threshold = int(os.getenv("AFTERMATH_MIN_CONFIDENCE", "90"))
+    # Default 0 = no filtering. Set AFTERMATH_MIN_CONFIDENCE=60 to keep only Established+Contested,
+    # or 90 to keep only Established nodes.
+    confidence_threshold = int(os.getenv("AFTERMATH_MIN_CONFIDENCE", "0"))
 
     def _enforce_domains(result: FinalGraph) -> FinalGraph:
         """Restore correct domain labels, filter unselected domains, filter low confidence."""
@@ -115,12 +116,11 @@ def synthesizer_node(state: AftermathState) -> dict:
         if selected_domains:
             result.nodes = [n for n in result.nodes if n.domain in selected_domains]
 
-        # Filter below confidence threshold
-        # If confidence_pct is 0 (not set), derive from categorical label
+        # Fill in confidence_pct from categorical label when LLM left it at 0
         for node in result.nodes:
             if node.confidence_pct == 0:
-                node.confidence_pct = {"Established": 90, "Contested": 60, "Speculative": 25}.get(
-                    node.confidence, 0
+                node.confidence_pct = {"Established": 92, "Contested": 62, "Speculative": 25}.get(
+                    node.confidence, 50
                 )
         result.nodes = [n for n in result.nodes if n.confidence_pct >= confidence_threshold]
 

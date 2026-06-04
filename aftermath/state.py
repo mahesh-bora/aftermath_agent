@@ -70,7 +70,7 @@ ALL_DOMAINS = list(DOMAIN_CONTEXTS.keys())
 
 class CausalNode(BaseModel):
     entity: str = Field(description="Specific real entity — institution, person, country, market index. Never generic.")
-    domain: str = Field(description="One of the 12 domains in uppercase")
+    domain: str = Field(default="", description="One of the 12 domains in uppercase")
     what: str = Field(description="What happened to this entity — 8 words max")
     how: str = Field(description="The specific causal mechanism — 5 words max, no vague verbs")
     confidence: str = Field(description="Established | Contested | Speculative")
@@ -102,9 +102,17 @@ class CausalEdge(BaseModel):
     )
 
 
+MAX_NODES_PER_DOMAIN = 4
+MIN_NODES_PER_DOMAIN = 1
+
+
 class DomainOutput(BaseModel):
     domain: str
-    nodes: list[CausalNode]
+    nodes: list[CausalNode] = Field(
+        min_length=MIN_NODES_PER_DOMAIN,
+        max_length=MAX_NODES_PER_DOMAIN,
+        description=f"Exactly {MIN_NODES_PER_DOMAIN}–{MAX_NODES_PER_DOMAIN} causal nodes. No more.",
+    )
 
 
 class OrchestratorBriefings(BaseModel):
@@ -131,15 +139,24 @@ class FinalGraph(BaseModel):
 class EventValidation(BaseModel):
     is_valid: bool = Field(description="True if trigger is a real traceable historical/political/economic/cultural event")
     reason: str = Field(description="One sentence explaining the decision")
+    normalized_query: str = Field(
+        description=(
+            "Canonical, precise form of the event. "
+            "E.g. 'Trump winning 2025 elections' → 'Donald Trump winning the 2024 US Presidential Election (Nov 2024)'. "
+            "Always populate this — even for invalid inputs, show what you understood."
+        )
+    )
     suggested_query: Optional[str] = Field(
         default=None,
-        description="If invalid, suggest a real event the user could ask about instead"
+        description="If invalid, suggest a real specific event the user could ask about instead"
     )
 
 
 class AftermathState(TypedDict):
     trigger_event: str
     selected_domains: list[str]
+    google_api_key: str              # BYOK key — threaded through so Send nodes can read it
+    acknowledged_query: str          # canonical form of what system understood
     is_valid_event: bool
     invalid_message: str
     orchestrator_briefings: dict[str, str]

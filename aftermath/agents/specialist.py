@@ -1,12 +1,11 @@
 import os
 import json
 import traceback
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from ..state import DomainOutput, CausalNode, DOMAIN_CONTEXTS
+from ..state import DomainOutput, CausalNode, DOMAIN_CONTEXTS, MAX_NODES_PER_DOMAIN
 from ..prompts import DOMAIN_SPECIALIST_SYSTEM, DOMAIN_SPECIALIST_USER
+from ..llm import make_llm, set_api_key
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 DEBUG = os.getenv("AFTERMATH_DEBUG", "0") == "1"
 
 
@@ -21,8 +20,11 @@ def domain_specialist_node(state: dict) -> dict:
     trigger_event: str = state["trigger_event"]
     domain_context = DOMAIN_CONTEXTS.get(domain, f"Domain: {domain}")
 
-    llm = ChatGoogleGenerativeAI(model=MODEL, temperature=0.8)
-    structured_llm = llm.with_structured_output(DomainOutput)
+    # Explicitly bind the BYOK key — ContextVar doesn't propagate into LangGraph's thread pool
+    if key := state.get("google_api_key"):
+        set_api_key(key)
+
+    llm = make_llm(temperature=0.8)
 
     messages = [
         SystemMessage(content=DOMAIN_SPECIALIST_SYSTEM.format(
@@ -69,11 +71,20 @@ def domain_specialist_node(state: dict) -> dict:
             text = text.rsplit("```", 1)[0].strip()
         data = json.loads(text)
         data["domain"] = domain
+        # Hard cap before validation — LLM sometimes ignores the 3–4 rule
+        if isinstance(data.get("nodes"), list) and len(data["nodes"]) > MAX_NODES_PER_DOMAIN:
+            print(f"[WARN] {domain}: LLM returned {len(data['nodes'])} nodes, truncating to {MAX_NODES_PER_DOMAIN}")
+            data["nodes"] = data["nodes"][:MAX_NODES_PER_DOMAIN]
         output = DomainOutput.model_validate(data)
 
     output.domain = domain
     for node in output.nodes:
         node.domain = domain
+
+    # Final hard cap — catches any path that slips past Pydantic Field max_length
+    if len(output.nodes) > MAX_NODES_PER_DOMAIN:
+        print(f"[WARN] {domain}: capping {len(output.nodes)} → {MAX_NODES_PER_DOMAIN} nodes")
+        output = output.model_copy(update={"nodes": output.nodes[:MAX_NODES_PER_DOMAIN]})
 
     if DEBUG:
         print(f"[DEBUG] {domain}: {len(output.nodes)} nodes")

@@ -15,6 +15,7 @@ def _route_after_orchestrator(state: AftermathState):
             "trigger_event": state["trigger_event"],
             "domain": domain,
             "briefing": briefing,
+            "google_api_key": state.get("google_api_key", ""),
         })
         for domain, briefing in state["orchestrator_briefings"].items()
     ]
