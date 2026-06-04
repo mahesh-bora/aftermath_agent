@@ -4,7 +4,7 @@ import traceback
 from langchain_core.messages import HumanMessage, SystemMessage
 from ..state import AftermathState, FinalGraph, DomainOutput
 from ..prompts import SYNTHESIZER_SYSTEM, SYNTHESIZER_USER
-from ..llm import make_llm
+from ..llm import make_llm, set_api_key
 
 DEBUG = os.getenv("AFTERMATH_DEBUG", "0") == "1"
 
@@ -82,6 +82,8 @@ def synthesizer_node(state: AftermathState) -> dict:
     if DEBUG:
         print(f"\n[DEBUG] synthesizer: {len(state['domain_outputs'])} domain outputs")
 
+    if key := state.get("google_api_key"):
+        set_api_key(key)
     llm = make_llm(temperature=0.5)
     domain_outputs_text = _format_domain_outputs(state["domain_outputs"])
 

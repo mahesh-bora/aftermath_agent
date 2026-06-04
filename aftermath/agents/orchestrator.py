@@ -4,7 +4,7 @@ import traceback
 from langchain_core.messages import HumanMessage, SystemMessage
 from ..state import AftermathState, OrchestratorBriefings, EventValidation
 from ..prompts import ORCHESTRATOR_BRIEF_SYSTEM, ORCHESTRATOR_BRIEF_USER
-from ..llm import make_llm
+from ..llm import make_llm, set_api_key
 
 DEBUG = os.getenv("AFTERMATH_DEBUG", "0") == "1"
 
@@ -101,6 +101,8 @@ def _validate_event(llm, trigger_event: str) -> EventValidation:
 
 
 def orchestrator_brief_node(state: AftermathState) -> dict:
+    if key := state.get("google_api_key"):
+        set_api_key(key)
     llm = make_llm(temperature=0.3)
     selected_domains = state["selected_domains"]
     trigger_event = state["trigger_event"]

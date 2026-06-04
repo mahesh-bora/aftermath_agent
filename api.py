@@ -289,7 +289,7 @@ async def analyze(
         return final
 
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         final_state = await loop.run_in_executor(None, _run_graph)
     except Exception as e:
         traceback.print_exc()
@@ -450,7 +450,7 @@ async def key_takeaways(
         raise json.JSONDecodeError("No valid JSON object found in LLM output", text, 0)
 
     llm = make_llm(temperature=0.3)
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     data = None
     last_err = None
 
@@ -545,7 +545,7 @@ async def detail(
 
     try:
         llm = make_llm(temperature=0.5)
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(None, lambda: llm.invoke(messages))
         text = response.content.strip()
     except Exception as e:
