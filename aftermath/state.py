@@ -28,7 +28,7 @@ DOMAIN_CONTEXTS: dict[str, str] = {
         "technical feasibility. Track what becomes economically necessary, what incumbents cannot defend, "
         "and what previously unviable business models suddenly work."
     ),
-    "SUPPLY_CHAIN": (
+    "SUPPLY CHAIN": (
         "Physical goods move through chokepoints governed by letters of credit, port capacity, and "
         "just-in-time inventory buffers. Disruptions cascade non-linearly. The bottleneck is rarely "
         "the obvious one — trace the dependencies two layers deep."
